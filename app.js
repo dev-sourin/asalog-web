@@ -118,7 +118,9 @@ async function boot() {
     setGate("初期設定が必要です", "config.js に Supabase の URL と anon key を書き込んでから、もう一度開いてください。", code);
     return;
   }
-  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  let baseUrl = SUPABASE_URL.trim();
+  try { baseUrl = new URL(baseUrl).origin; } catch {}
+  sb = createClient(baseUrl, SUPABASE_ANON_KEY.trim(), { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
   sb.auth.onAuthStateChange((event, s) => {
     if (event === "PASSWORD_RECOVERY") { session = s; show("newpass"); return; }
     if (event === "SIGNED_OUT") { session = null; uid = null; me = null; show("auth"); return; }
