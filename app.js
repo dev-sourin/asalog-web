@@ -4,6 +4,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
 // ---------- helpers ----------
 const $ = (s) => document.querySelector(s);
+const setText = (s, v) => { const e = document.querySelector(s); if (e) e.textContent = v; };
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -682,9 +683,9 @@ async function loadAdmin() {
   const pub = (all || []).filter(p => p.visibility === "public");
   adminCounts = {}; adminPrivCounts = {};
   (all || []).forEach(p => { const t = p.visibility === "public" ? adminCounts : adminPrivCounts; t[p.author] = (t[p.author] || 0) + 1; });
-  $("#a-posts").textContent = pub.length;
-  $("#a-private").textContent = (all || []).length - pub.length;
-  $("#a-members-n").textContent = adminProfiles.length;
+  setText("#a-posts", pub.length);
+  setText("#a-private", (all || []).length - pub.length);
+  setText("#a-members-n", adminProfiles.length);
   renderAdmin();
 }
 function renderAdmin() {
