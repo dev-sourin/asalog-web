@@ -198,7 +198,8 @@ drop policy if exists "posts read" on public.posts;
 create policy "posts read" on public.posts for select to authenticated using (
   author = auth.uid()
   or (public.is_active(auth.uid()) and public.post_is_shared(posts))
-  or (public.is_admin(auth.uid()) and visibility = 'public')
+  -- 管理者は「自分だけ」の記録も含めて全員の記録（文字データ）を読める。写真は下の Storage 側で本人のみに制限
+  or public.is_admin(auth.uid())
 );
 drop policy if exists "posts insert own" on public.posts;
 create policy "posts insert own" on public.posts for insert to authenticated

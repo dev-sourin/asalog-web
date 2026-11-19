@@ -338,7 +338,7 @@ function armed(b, fn, label = "もう一度押すと実行") {
   Promise.resolve().then(fn).catch(() => { b.textContent = "できませんでした"; b.disabled = false; });
 }
 
-function card(p) {
+function card(p, opts = {}) {
   const c = el("article", "card");
   const who = el("div", "who");
   const nm = nameOf(p.author);
@@ -349,14 +349,16 @@ function card(p) {
   const wb = el("div", "wake-badge"); wb.appendChild(el("small", null, "起床")); wb.appendChild(document.createTextNode(p.wake || "–"));
   who.append(av, id, wb); c.appendChild(who);
 
-  const src = photoSrc(p);
+  const src = opts.noPhoto ? null : photoSrc(p);
   if (src && !p.skipped) { const img = el("img", "photo"); img.alt = p.menu ? `朝ごはん：${p.menu}` : "朝ごはんの写真"; img.loading = "lazy"; img.src = src; img.onerror = () => img.replaceWith(el("div", "photo-missing", "写真を表示できません")); c.appendChild(img); }
 
   const body = el("div", "body");
   if (p.skipped) body.appendChild(el("div", "menu skip", "朝ごはんはなし"));
   else if (p.menu) body.appendChild(el("div", "menu", p.menu));
   const facts = el("div", "facts");
+  if (opts.showDate) facts.appendChild(el("span", "fact", dayLabel(p.date)));
   if (p.visibility === "private") facts.appendChild(el("span", "fact lock", "自分だけ"));
+  if (opts.noPhoto && p.photo_path && !p.skipped) facts.appendChild(el("span", "fact lock", "写真あり（本人のみ表示）"));
   if (p.photo_hidden && p.visibility !== "private" && p.photo_path) facts.appendChild(el("span", "fact lock", p.author === uid ? "写真は自分だけに表示" : "写真は非公開"));
   if (!p.skipped && MAKER_LABEL[p.maker]) facts.appendChild(el("span", "fact", MAKER_LABEL[p.maker]));
   if (PLACE_LABEL[p.place]) facts.appendChild(el("span", "fact", PLACE_LABEL[p.place]));
@@ -373,6 +375,7 @@ function card(p) {
   if (p.note) body.appendChild(el("div", "note", p.note));
   c.appendChild(body);
 
+  if (opts.readOnly) return c;
   const foot = el("div", "foot");
   if (p.visibility === "public") {
     const set = likes[p.id] || new Set(); const mine = set.has(uid);
@@ -668,17 +671,19 @@ $("#acct-del").addEventListener("click", async () => {
 });
 
 // ---------- admin ----------
-let adminProfiles = [], adminCounts = {};
+let adminProfiles = [], adminCounts = {}, adminPrivCounts = {};
 async function loadAdmin() {
   if (!isAdmin()) return;
-  const [{ data: profs }, { data: pub }] = await Promise.all([
+  const [{ data: profs }, { data: all }] = await Promise.all([
     sb.from("profiles").select("*").order("created_at", { ascending: true }),
-    sb.from("posts").select("id,author,photo_path").eq("visibility", "public").limit(10000),
+    sb.from("posts").select("id,author,photo_path,visibility").limit(20000),
   ]);
   adminProfiles = profs || [];
-  adminCounts = {}; (pub || []).forEach(p => { adminCounts[p.author] = (adminCounts[p.author] || 0) + 1; });
-  $("#a-posts").textContent = (pub || []).length;
-  $("#a-photos").textContent = (pub || []).filter(p => p.photo_path).length;
+  const pub = (all || []).filter(p => p.visibility === "public");
+  adminCounts = {}; adminPrivCounts = {};
+  (all || []).forEach(p => { const t = p.visibility === "public" ? adminCounts : adminPrivCounts; t[p.author] = (t[p.author] || 0) + 1; });
+  $("#a-posts").textContent = pub.length;
+  $("#a-private").textContent = (all || []).length - pub.length;
   $("#a-members-n").textContent = adminProfiles.length;
   renderAdmin();
 }
@@ -696,12 +701,13 @@ function renderAdmin() {
     const info = el("div");
     const nm = el("div", "nm"); nm.append(m.nickname, el("span", "badge " + st, STATUS_LABEL[st]));
     if (m.role === "admin" && m.status !== "active") nm.appendChild(el("span", "badge " + m.status, STATUS_LABEL[m.status]));
-    const n = adminCounts[m.id] || 0;
-    info.append(nm, el("div", "sub", `${new Date(m.created_at).toLocaleDateString("ja-JP")} 登録・公開投稿 ${n}件${m.bio ? "・" + m.bio : ""}`));
+    const n = adminCounts[m.id] || 0, np = adminPrivCounts[m.id] || 0;
+    info.append(nm, el("div", "sub", `${new Date(m.created_at).toLocaleDateString("ja-JP")} 登録・公開 ${n}件・自分だけ ${np}件${m.bio ? "・" + m.bio : ""}`));
     row.append(av, info);
+    const acts = el("div", "acts");
+    const mk = (label, fn, cls) => { const b = el("button", "pill-btn" + (cls ? " " + cls : ""), label); b.type = "button"; b.addEventListener("click", () => fn(b)); acts.appendChild(b); };
+    if (n + np) mk(`記録を見る（${n + np}件）`, () => openMemberRecords(m));
     if (m.id !== uid) {
-      const acts = el("div", "acts");
-      const mk = (label, fn, cls) => { const b = el("button", "pill-btn" + (cls ? " " + cls : ""), label); b.type = "button"; b.addEventListener("click", () => fn(b)); acts.appendChild(b); };
       if (m.status === "pending") mk("承認する", () => updateMember(m.id, { status: "active" }));
       if (m.status === "active") mk("参加を停止", (b) => armed(b, () => updateMember(m.id, { status: "blocked" })), "danger");
       if (m.status === "blocked") mk("停止を解除", () => updateMember(m.id, { status: "active" }));
@@ -714,14 +720,28 @@ function renderAdmin() {
         if (error) throw error;
         await loadAdmin(); await loadFeed();
       }), "danger");
-      row.appendChild(acts);
     }
+    if (acts.childNodes.length) row.appendChild(acts);
     box.appendChild(row);
   });
   $("#a-group").value = config.group_name || "";
   $("#a-welcome").value = config.welcome || "";
   (config.approval === "manual" ? $("#appr-manual") : $("#appr-auto")).checked = true;
 }
+
+async function openMemberRecords(m) {
+  const panel = $("#a-records"), list = $("#a-records-list");
+  $("#a-records-title").textContent = `${m.nickname} さんの記録`;
+  list.replaceChildren(el("p", "hint", "読み込み中…"));
+  panel.hidden = false; panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  const { data, error } = await sb.from("posts").select("*").eq("author", m.id).order("date", { ascending: false }).limit(500);
+  if (error) { list.replaceChildren(el("p", "hint", "読み込めませんでした：" + errText(error))); return; }
+  profiles[m.id] = profiles[m.id] || m;
+  list.replaceChildren();
+  if (!data.length) { list.appendChild(el("p", "hint", "記録はまだありません。")); return; }
+  const wrap = el("div", "list"); data.forEach(p => wrap.appendChild(card(p, { noPhoto: true, readOnly: true, showDate: true }))); list.appendChild(wrap);
+}
+$("#a-records-close").addEventListener("click", () => { $("#a-records").hidden = true; });
 async function updateMember(id, patch) {
   const { error } = await sb.from("profiles").update(patch).eq("id", id);
   if (error) { $("#a-status").textContent = "変更できませんでした：" + errText(error); return; }
@@ -742,7 +762,7 @@ $("#a-copy").addEventListener("click", async () => {
 });
 $("#a-json").addEventListener("click", async () => {
   const st = $("#a-dstatus"); st.textContent = "まとめています…";
-  const { data: pub, error } = await sb.from("posts").select("*").eq("visibility", "public").order("date").limit(10000);
+  const { data: pub, error } = await sb.from("posts").select("*").order("date").limit(20000);
   if (error) { st.textContent = "書き出せませんでした：" + errText(error); return; }
   const nick = Object.fromEntries(adminProfiles.map(p => [p.id, p.nickname]));
   download(`asalog_all_${stamp()}.json`, JSON.stringify({
@@ -755,10 +775,10 @@ $("#a-json").addEventListener("click", async () => {
 });
 $("#a-csv").addEventListener("click", async () => {
   const st = $("#a-dstatus");
-  const { data: pub, error } = await sb.from("posts").select("*").eq("visibility", "public").order("date").limit(10000);
+  const { data: pub, error } = await sb.from("posts").select("*").order("date").limit(20000);
   if (error) { st.textContent = "書き出せませんでした：" + errText(error); return; }
   adminProfiles.forEach(p => { profiles[p.id] = profiles[p.id] || p; });
-  download(`asalog_posts_${stamp()}.csv`, toCsv(pub || []), "text/csv");
+  download(`asalog_all_records_${stamp()}.csv`, toCsv(pub || []), "text/csv");
   st.textContent = "書き出しました。";
 });
 

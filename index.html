@@ -94,7 +94,7 @@
       <div class="block" id="j-rules-block">
         <h2>参加のルール</h2>
         <ul class="rules">
-          <li>投稿は、参加が認められたメンバーだけが見られます。「自分だけ」の記録と非公開の写真は本人しか見られません。</li>
+          <li>投稿は、参加が認められたメンバーだけが見られます。「自分だけ」の記録はタイムラインに載らず、内容（写真以外）は本人と管理者だけが見られます。写真は「自分だけ」「載せない」にすると本人しか見られません。</li>
           <li>写真に他の人の顔や、住所などの個人情報が写らないようにしてください。</li>
           <li>管理者は、ルールに合わない投稿の削除や参加の停止ができます。</li>
           <li>自分のデータは「わたしの記録」からいつでも書き出し・削除できます。</li>
@@ -137,8 +137,9 @@
           <span class="lbl">公開範囲</span>
           <div class="seg" role="radiogroup" aria-label="公開範囲">
             <input type="radio" name="vis" id="vis-public" value="public" checked><label for="vis-public">みんなに公開<small>タイムラインに載る</small></label>
-            <input type="radio" name="vis" id="vis-private" value="private"><label for="vis-private">自分だけ<small>自分の記録にだけ残る</small></label>
+            <input type="radio" name="vis" id="vis-private" value="private"><label for="vis-private">自分だけ<small>タイムラインに載らない</small></label>
           </div>
+          <p class="hint" id="vis-hint">「自分だけ」の記録も、内容（写真以外）は管理者が確認できます。</p>
         </div>
         <div class="field"><label for="date">日付</label><input type="date" id="date"></div>
       </div>
@@ -264,6 +265,11 @@
 
   <!-- admin -->
   <section class="view" id="view-admin">
+    <div class="panel" id="a-records" hidden>
+      <div class="btn-row" style="justify-content:space-between;align-items:center"><h2 id="a-records-title">記録</h2><button class="icon-btn" type="button" id="a-records-close">閉じる</button></div>
+      <p class="hint">「自分だけ」の記録も含めて表示しています。写真は本人以外には表示されません。</p>
+      <div id="a-records-list"></div>
+    </div>
     <div class="panel">
       <h2>参加者</h2>
       <div class="kv"><div><b id="a-active">0</b><span>参加中</span></div><div><b id="a-pending">0</b><span>承認待ち</span></div><div><b id="a-blocked">0</b><span>停止中</span></div></div>
@@ -289,12 +295,12 @@
     </div>
     <div class="panel">
       <h2>データ管理</h2>
-      <div class="kv"><div><b id="a-posts">0</b><span>公開投稿</span></div><div><b id="a-photos">0</b><span>写真つき</span></div><div><b id="a-members-n">0</b><span>登録者</span></div></div>
+      <div class="kv"><div><b id="a-posts">0</b><span>公開の記録</span></div><div><b id="a-private">0</b><span>自分だけの記録</span></div><div><b id="a-members-n">0</b><span>登録者</span></div></div>
       <div class="btn-row">
         <button class="btn ghost sm" type="button" id="a-json">全データを書き出す（JSON）</button>
-        <button class="btn ghost sm" type="button" id="a-csv">公開投稿をCSVで書き出す</button>
+        <button class="btn ghost sm" type="button" id="a-csv">全員の記録をCSVで書き出す</button>
       </div>
-      <p class="hint">書き出しに含まれるのは公開投稿と参加者のプロフィールです。各自の「自分だけ」の記録は管理者にも見えません。</p>
+      <p class="hint">書き出しには「自分だけ」を含む全員の記録（写真以外）と参加者のプロフィールが入ります。メールアドレスとパスワードは含まれません。</p>
       <div class="status" id="a-dstatus" role="status"></div>
     </div>
   </section>
